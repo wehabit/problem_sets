@@ -1,7 +1,7 @@
 ---
 title: "Psych 251 PS2: Tidying Data"
 author: "Andrew Lampinen"
-date: "September 27, 2018"
+date: "Oct 12, 2018"
 output:
   html_document:
     toc: true
@@ -39,6 +39,10 @@ Take a look at the data structure:
 head(d)
 ```
 
+```{r}
+str(d)
+```
+
 This data is what we call **wide form** -- each subject is a single row, and the columns represent different observations. This is a somewhat inconvenient way of representing the data, for example if we wanted to do the same operation to each likert rating (for example normalize it to be in the range 0-1), we'd have to do it on each of the 40 or so rating columns. To avoid this, our eventual goal will be to convert the data into **long form**, where each row is a single observation. 
 
 For now, take a look at the column names to get a better idea of what all is in the dataset.
@@ -50,12 +54,15 @@ colnames(d)
 And see if you can figure out what range the likert scores are in. What's the highest number on the likert scale, and what's the lowest? (Hint, `d$Game1Angry1` is one of the likert rating columns, and you may want to use `unique` or `range` or `hist`)
 
 ```{r}
-## your code here
+# your code here
+
+d$Game1Angry1 %>% range(na.rm = TRUE) 
+
 
 ```
 
-Highest number: [Your answer here]
-Lowest number: [Your answer here]
+Highest number: 1
+Lowest number: 7
 
 # cleaning up a bit
 
@@ -73,15 +80,30 @@ You can see participant 23's data and the fact that they did not do part 1 by lo
 
 ```{r}
 tail(d)
+d$Subject
+# filter out the subject 2 and 23
+d_cleaned <- filter(d, !(Subject %in% c(2,23)))
+d_cleaned$Subject
+
 ```
+
 
 Notice that participant 23 has missing values for part 1.
 
 The researchers have made a column called `DoNotUse` based on their exlusion criteria. Use this column to filter the dataframe! (hint: this is a little trickier than it might be because of how R treats NA values. You may want to check out `?is.na`.)
 
 ```{r}
+# print out the d_clean and d to see the differences
+#print("d_cleaned$DoNotUse")
+#d_cleaned$DoNotUse
+#print("d$DoNotUse")
+#d$DoNotUse
+
+# filter out d via use of DoNotUse field
 filtered_d = d %>% 
-  filter(   ) # your code here: exclude subjects that are marked as "DoNotUse"
+  filter(is.na(d$DoNotUse)) # your code here: exclude subjects that are marked as "DoNotUse"
+#print("filtered_d$DoNotUse")
+#filtered_d$DoNotUse
 ```
 
 It's good practice to assign a new variable name (in this case `filtered_d`) to a data frame when you change it in an important way, or apply a code chunk that shouldn't be run twice. This helps prevent you seeing different results when you run your code in chunks (and might run one multiple times, or skip it, etc.) vs. knit the document.
@@ -112,13 +134,14 @@ rating_hyp_d = filtered_d %>%
   select(-DoNotUseVideoGamePerformanceData, # now get rid of that column
          -starts_with("DinerDash"), # and the other columns we don't need
          -starts_with("SOF"))
+#rating_hyp_d
 ```
 
 Now you try! Fill in the selection criteria to get rid of the "Game" columns, which we don't need for the performance hypothesis. (It's simpler than the code block above, because you don't need to do a `filter` first, only a `select`.)
 
 ```{r}
 performance_hyp_d = filtered_d %>% 
-  select( ) # your code here: remove the columns containing "Game" in the name
+  select(-contains("Game")) # your code here: remove the columns containing "Game" in the name
 ```
 
 # Converting to long form
@@ -147,13 +170,18 @@ Now let's actually convert the performance dataset
 ```{r}
 performance_hyp_long_d = performance_hyp_d %>% 
   gather(Measurement, Score, -c("Subject", "Cond"))
+
+performance_hyp_long_d
 ```
 
 And you can convert the rating dataset! (Call the "Key" column "Measurement" and call the "Value" column "Rating", so that the code below will work)
 
 ```{r}
 rating_hyp_long_d = rating_hyp_d %>%
-  ## your code here
+  # your code here
+  gather(Measurement, Score,-c("Subject", "Cond") )
+
+#rating_hyp_long_d
 ```
 
 # Splitting columns
@@ -165,16 +193,15 @@ performance_hyp_long_d = performance_hyp_long_d %>%
   mutate(ConfrontationalGame = grepl("SOF", Measurement), # create a new variable that will say whether the measurement was of the game soldier of fortune (SOF).
          WithMusic = !grepl("NoMusic|WithoutMusic", Measurement), # creates a new column named WithMusic, which is False if the measurement contains *either* "NoMusic" or "WithoutMusic"
          MusicCondition = factor(ifelse(Cond > 3, Cond-3, Cond), levels = 1:3, labels = c("Anger", "Exciting", "Neutral"))) # Get rid of uninterpretable condition labels
-
+performance_hyp_long_d
 ```
 
 Now you can help! For the rating dataset, write a test on a measurement name, using `grepl` or `%in%` to figure out whether it's a recall or a music rating. Your new `IsRecall` column should be true if the measurement name contain either "Friends" or "Strangers".
 
 ```{r}
 rating_hyp_long_d = rating_hyp_long_d %>%
-  mutate(
-    IsRecall = ,## Your code here
-  )
+  ## Your code here
+  mutate(IsRecall = grepl("Friends|Strangers", Measurement))  
 ```
 
 Here are a couple other useful ways of manipulating columns. (You won't remember all the functions you see here now, but that's okay. You can always reference this tutorial later if there's something you need to figure out how to do.)
@@ -187,7 +214,10 @@ rating_hyp_long_d = rating_hyp_long_d %>%
     Emotion = str_extract(Measurement, "Angry|Neutral|Excited|Exciting|Calm"),
     Emotion = ifelse(Emotion == "Excited", "Exciting", # this just gets rid of some annoying labeling choices
               ifelse(Emotion == "Calm", "Neutral", Emotion))
-    ) 
+    ) %>% 
+  mutate(IsRecall = factor(IsRecall, levels=c(F, T), labels=c("Music", "Recall"))) %>% 
+  mutate(ConfrontationalGame = factor(ConfrontationalGame, levels=c(F, T), labels=c("Confrontational", "Nonconfrontational"))) 
+#rating_hyp_long_d
 ```
 
 # Groups, Summaries, and Results
@@ -210,9 +240,12 @@ This makes it clear why we can't just z-score the games together! The scores are
 
 ```{r}
 performance_hyp_long_d = performance_hyp_long_d %>%
+  mutate(ConfrontationalGame = factor(ConfrontationalGame, levels=c(F, T), labels=c("Confrontational", "Nonconfrontational"))) %>% 
   group_by(ConfrontationalGame, WithMusic) %>% # we're going to compute four sets of z-scores, one for the confrontational game without music, one for the confrontational game with, one for the nonconfrontational game without music, and one for the nonconfrontational game with
   mutate(z_scored_performance = scale(Score)) %>%
   ungroup()
+
+#performance_hyp_long_d
 ```
 
 ## Rating Hypothesis
@@ -222,6 +255,11 @@ The rating hypothesis analysis also requires some grouped manipulation: the expe
 ```{r}
 rating_summary_d = rating_hyp_long_d %>% 
   ## your code here
+  #mutate(IsRecall = factor(IsRecall, levels=c(F, T), labels=c("Music", "Recall"))) %>% 
+  #mutate(ConfrontationalGame = factor(ConfrontationalGame, levels=c(F, T), labels=c("Confrontational", "Nonconfrontational"))) %>% 
+  group_by(ConfrontationalGame,Emotion, IsRecall) %>% 
+  summarize(MeanRating = mean(Score, na.rm=T))
+ 
 ```
 
 Let's take a look at the result:
@@ -233,9 +271,10 @@ rating_summary_d
 And a simple bar plot (don't worry too much about what exactly this code is doing):
 
 ```{r TamirFig1}
-ggplot(rating_summary_d, aes(x=ConfrontationalGame, y=MeanRating, fill=Emotion)) +
+ggplot(rating_summary_d, aes(x=ConfrontationalGame, y=MeanRating, fill=Emotion )) +
   geom_bar(position="dodge", stat="identity") + 
-  scale_fill_brewer(palette="Set1")
+  scale_fill_brewer(palette="Set1") +
+  facet_wrap(~ IsRecall)
 ```
 
 Up to reordering (and the fact that we didn't compute error bars), this is a pretty decent replication of Fig. 1 from the original Tamir et al. paper. The ratings were highest for Angry in the confrontational game, and lowest for Angry in the non-confrontational game.
@@ -243,7 +282,7 @@ Up to reordering (and the fact that we didn't compute error bars), this is a pre
 And the long form dataset makes it easy to run a linear model (don't worry too much about this, we'll talk more about it in 252). 
 
 ```{r}
-model = lm(Rating ~ ConfrontationalGame * Emotion, rating_hyp_long_d)
+model = lm(Score ~ ConfrontationalGame * Emotion, rating_hyp_long_d)
 summary(model)
 ```
 
@@ -255,7 +294,7 @@ To compute the difference score, we have to make our data a bit wider. We now wa
 
 ```{r}
 performance_diff_d = performance_hyp_long_d %>%
-  mutate(WithMusic = factor(WithMusic, levels=c(F, T), labels=c("PreMusic", "PostMusic"))) %>% # first, tweak the variable so our code is easier to read.
+  mutate(WithMusic = factor(WithMusic, levels=c(F, T), labels=c("PreMusic", "PostMusic"))) %>% # first, tweak the variable so our code is easier to read. Lable the F abd Tl 
   select(-c("Score", "Measurement")) %>% # now we remove columns we don't need (bonus: leave them in and see if you can understand what goes wrong!)
   spread(WithMusic, z_scored_performance) %>%
   mutate(ImprovementScore=PostMusic-PreMusic)
@@ -272,8 +311,15 @@ If you don't understand every step of that code (or any other `dplyr` code), it 
 Now we're finally to reproduce Fig. 2 from Tamir et al., we just need to get the mean differences within each game and each kind of music, and save them to a variable called `MeanImprovementScore`:
 
 ```{r}
+ 
+ library(plotrix)
+
 performance_diff_summary_d = performance_diff_d %>%
   ## Your code here
+  group_by(ConfrontationalGame,MusicCondition)  %>% 
+  summarize(MeanImprovementScore = mean(ImprovementScore, na.rm=T), sdImprovementScore = sd(ImprovementScore, na.rm=T), seImprovementScore = std.error(ImprovementScore, na.rm=T))
+  
+
 ```
 
 Let's take a look at your result (if it has `NA` values, how can you fix it?):
@@ -285,9 +331,11 @@ performance_diff_summary_d
 and plot it!
 
 ```{r TamirFig2}
-ggplot(performance_diff_summary_d, aes(x=ConfrontationalGame, y=MeanImprovementScore, fill=MusicCondition)) +
-  geom_bar(position="dodge", stat="identity") + 
-  scale_fill_brewer(palette="Set1")
+ggplot(performance_diff_summary_d, aes(x=ConfrontationalGame, y= MeanImprovementScore, fill=MusicCondition )) +
+    geom_bar(position="dodge", stat="identity") + 
+   geom_errorbar(aes(ymin = MeanImprovementScore - seImprovementScore, ymax = MeanImprovementScore + seImprovementScore), width = .085,position=position_dodge(1.), stat="identity") +  
+   scale_fill_brewer(palette="Set1") 
+
 ```
 
 (Bonus: also calculate the SEM in the summary data, and then add errorbars to the plot with `geom_errorbar`!)
@@ -298,4 +346,6 @@ Not quite as exact a replication of the effect as Fig. 1. This concurs with the 
 performance_model = lm(ImprovementScore ~ ConfrontationalGame * MusicCondition, performance_diff_d)
 summary(performance_model)
 ```
+
+
 

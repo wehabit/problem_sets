@@ -1,0 +1,10 @@
+name: Publish Document
+title:
+username:
+account: rpubs
+server: rpubs.com
+hostUrl: rpubs.com
+appId: https://api.rpubs.com/api/v1/document/429444/0c8c447a3da5470799bf52903c72f1aa
+bundleId: https://api.rpubs.com/api/v1/document/429444/0c8c447a3da5470799bf52903c72f1aa
+url: http://rpubs.com/paris007/429444
+when: 1539593383.7701
