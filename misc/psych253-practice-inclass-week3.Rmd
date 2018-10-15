@@ -1,0 +1,71 @@
+---
+title: "More on tidy data"
+output: html_notebook
+---
+
+
+# Preliminaries
+
+Load the tidyverse. 
+
+```{r}
+library(tidyverse)
+```
+
+# MTCars
+
+Reshape mtcars.
+
+```{r}
+tidycars <- mtcars %>%
+  mutate(car = rownames(mtcars)) %>%
+  gather(feature, value, mpg:carb) %>%
+  separate(car, into = c("make","model"))
+
+head(tidycars)
+```
+
+Why would you reshape? Plotting by panel is one way. 
+
+```{r}
+ggplot(filter(tidycars, make %in% c("Merc","Toyota")), 
+       aes(x = value, fill = make)) + 
+  geom_histogram() + 
+  facet_wrap(~feature, scales = "free_x")
+```
+
+
+# Sklar
+
+Load the data from Sklar et al. (2012), experiment 2.
+
+```{r}
+d_sklar <- read_csv("http://langcog.stanford.edu/sklar_expt6a_corrected.csv")
+
+head(d_sklar)
+```
+
+We need to reshape here - much easier to do statistical analysis. 
+
+```{r}
+d_sklar %>%
+  gather(participant, rt, matches("[0-9]+"))
+```
+
+# Iris
+
+```{r}
+head(iris)
+
+# gather: 
+# 1) variable (name of the column names), 
+# 2) value (thing in the columns), 
+# 3) range of columns
+
+tidyiris <- iris %>%
+  mutate(observation = 1:n()) %>%
+  gather(measurement, size_in_cm, Sepal.Length, Sepal.Width, Petal.Length, Petal.Width)
+
+iris
+tidyiris
+```
